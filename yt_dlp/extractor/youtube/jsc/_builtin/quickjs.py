@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 import pathlib
 import shlex
 import subprocess
+import sys
 import tempfile
 
 from yt_dlp.extractor.youtube.jsc._builtin.ejs import EJSBaseJCP
@@ -22,6 +24,21 @@ class QuickJSJCP(EJSBaseJCP, BuiltinIEContentProvider):
     PROVIDER_NAME = 'quickjs'
     JS_RUNTIME_NAME = 'quickjs'
 
+    def _get_temp_file(self):
+        # Cygwin uses POSIX paths (i.e. /tmp) that are not understood by native win32 apps (i.e. qjs.exe)
+        if sys.platform == 'cygwin':
+            # Inspired from https://github.com/python/cpython/blob/3.14/Lib/tempfile.py#L168-L171
+            for temp_dir in [os.path.expandvars(r'$USERPROFILE\AppData\Local\Temp'),
+                             os.path.expandvars(r'$SYSTEMROOT\Temp'),
+                             r'c:\temp', r'c:\tmp']:
+                try:
+                    # Try each candidate directory until success
+                    return tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False, encoding='utf-8', dir=temp_dir)
+                except FileNotFoundError:
+                    pass
+        # Use default directory for native platforms (including win32) or if no well-known win32 directory can be used under Cygwin
+        return tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False, encoding='utf-8')
+
     def _run_js_runtime(self, stdin: str, /) -> str:
         if self.runtime_info.name == 'quickjs-ng':
             self.logger.warning('QuickJS-NG is missing some optimizations making this very slow. Consider using upstream QuickJS instead.')
@@ -29,7 +46,7 @@ class QuickJSJCP(EJSBaseJCP, BuiltinIEContentProvider):
             self.logger.warning('Older QuickJS versions are missing optimizations making this very slow. Consider upgrading.')
 
         # QuickJS does not support reading from stdin, so we have to use a temp file
-        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False, encoding='utf-8')
+        temp_file = self._get_temp_file()
         try:
             temp_file.write(stdin)
             temp_file.close()
