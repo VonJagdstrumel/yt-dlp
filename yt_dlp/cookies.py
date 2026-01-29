@@ -202,10 +202,17 @@ def _extract_firefox_cookies(profile, container, logger):
 
 def _firefox_browser_dirs():
     if sys.platform in ('cygwin', 'win32'):
-        yield from map(os.path.expandvars, (
-            R'%APPDATA%\Mozilla\Firefox\Profiles',
-            R'%LOCALAPPDATA%\Packages\Mozilla.Firefox_n80bbvh6b1yt2\LocalCache\Roaming\Mozilla\Firefox\Profiles',
-        ))
+        if sys.platform == 'cygwin':
+            appdata_local = os.path.expandvars('$LOCALAPPDATA')
+            appdata_roaming = os.path.expandvars('$APPDATA')
+        else:
+            appdata_local = os.path.expandvars('%LOCALAPPDATA%')
+            appdata_roaming = os.path.expandvars('%APPDATA%')
+
+        yield from (
+            os.path.join(appdata_roaming, R'Mozilla\Firefox\Profiles'),
+            os.path.join(appdata_local, R'Packages\Mozilla.Firefox_n80bbvh6b1yt2\LocalCache\Roaming\Mozilla\Firefox\Profiles'),
+        )
 
     elif sys.platform == 'darwin':
         yield os.path.expanduser('~/Library/Application Support/Firefox/Profiles')
@@ -234,8 +241,13 @@ def _firefox_cookie_dbs(roots):
 def _get_chromium_based_browser_settings(browser_name):
     # https://chromium.googlesource.com/chromium/src/+/HEAD/docs/user_data_dir.md
     if sys.platform in ('cygwin', 'win32'):
-        appdata_local = os.path.expandvars('%LOCALAPPDATA%')
-        appdata_roaming = os.path.expandvars('%APPDATA%')
+        if sys.platform == 'cygwin':
+            appdata_local = os.path.expandvars('$LOCALAPPDATA')
+            appdata_roaming = os.path.expandvars('$APPDATA')
+        else:
+            appdata_local = os.path.expandvars('%LOCALAPPDATA%')
+            appdata_roaming = os.path.expandvars('%APPDATA%')
+
         browser_dir = {
             'brave': os.path.join(appdata_local, R'BraveSoftware\Brave-Browser\User Data'),
             'chrome': os.path.join(appdata_local, R'Google\Chrome\User Data'),
